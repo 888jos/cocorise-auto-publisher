@@ -111,6 +111,7 @@ export async function POST(request: Request) {
     }
     if (action === "upload-post-connect") {
       const accountGroupId = String(form.get("account_group_id") ?? "");
+      const platform = platformField(form);
       const { data: account, error } = await db
         .from("account_groups")
         .select("upload_post_profile")
@@ -119,8 +120,8 @@ export async function POST(request: Request) {
       if (error) throw error;
       if (!account.upload_post_profile) throw new Error("Configure an Upload-Post profile username first.");
       const appUrl = process.env.NEXT_PUBLIC_APP_URL || new URL(request.url).origin;
-      const redirectUrl = `${appUrl}/accounts?upload_post_connected=${encodeURIComponent(account.upload_post_profile)}`;
-      const accessUrl = await createUploadPostConnectUrl(account.upload_post_profile, redirectUrl);
+      const redirectUrl = `${appUrl}/accounts?upload_post_connected=${encodeURIComponent(account.upload_post_profile)}&platform=${platform}`;
+      const accessUrl = await createUploadPostConnectUrl(account.upload_post_profile, redirectUrl, platform);
       return NextResponse.redirect(accessUrl, 303);
     }
     if (action === "upload-post-profile-test") {

@@ -107,12 +107,22 @@ export async function ensureUploadPostProfile(username: string) {
   return created.profile ?? { username: normalized };
 }
 
-export async function createUploadPostConnectUrl(username: string, redirectUrl: string) {
+export async function createUploadPostConnectUrl(username: string, redirectUrl: string, platform?: SocialPlatform) {
   await ensureUploadPostProfile(username);
   const response = await uploadPostRequest<{ success: boolean; access_url: string }>("/uploadposts/users/generate-jwt", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ username: username.trim(), redirect_url: redirectUrl, show_calendar: false })
+    body: JSON.stringify({
+      username: username.trim(),
+      redirect_url: redirectUrl,
+      show_calendar: false,
+      language: "fr",
+      ...(platform ? {
+        platforms: [platform],
+        connect_title: `Connecter ${platform === "youtube" ? "YouTube" : platform === "tiktok" ? "TikTok" : "Instagram"} à ${username.trim()}`,
+        connect_description: `Vérifie le compte ${platform} affiché avant de l'autoriser.`
+      } : {})
+    })
   });
   if (!response.access_url) throw new Error("Upload-Post did not return an account connection URL.");
   return response.access_url;

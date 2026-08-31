@@ -138,13 +138,16 @@ export default async function AccountsPage({ searchParams }: { searchParams?: Pr
                     <button className="rounded-md border border-line bg-panel2 px-3 py-2 text-sm text-white hover:border-mint/40" type="submit">Save</button>
                   </form>
                   <div className="flex flex-wrap gap-2">
-                    <form action="/api/actions" method="post">
-                      <input type="hidden" name="action" value="upload-post-connect" />
-                      <input type="hidden" name="account_group_id" value={account.id} />
-                      <button className="inline-flex items-center gap-1.5 rounded-md border border-mint/30 bg-mint/5 px-2.5 py-1.5 text-xs text-mint hover:bg-mint/10" type="submit">
-                        <Link2 className="h-3.5 w-3.5" /> Connect platforms
-                      </button>
-                    </form>
+                    {platforms.filter((platform) => account[platform.enabledKey]).map((platform) => (
+                      <form action="/api/actions" method="post" key={platform.id}>
+                        <input type="hidden" name="action" value="upload-post-connect" />
+                        <input type="hidden" name="account_group_id" value={account.id} />
+                        <input type="hidden" name="platform" value={platform.id} />
+                        <button className="inline-flex items-center gap-1.5 rounded-md border border-mint/30 bg-mint/5 px-2.5 py-1.5 text-xs text-mint hover:bg-mint/10" type="submit">
+                          <Link2 className="h-3.5 w-3.5" /> {platform.label}
+                        </button>
+                      </form>
+                    ))}
                     <form action="/api/actions" method="post">
                       <input type="hidden" name="action" value="upload-post-profile-test" />
                       <input type="hidden" name="account_group_id" value={account.id} />
