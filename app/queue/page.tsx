@@ -1,4 +1,4 @@
-import { format } from "date-fns";
+import { formatInTimeZone } from "date-fns-tz";
 import { CalendarClock, Shuffle, XCircle } from "lucide-react";
 import { ConfigurationWarning, EmptyState } from "@/components/empty-state";
 import { PageHeader, Panel, StatusPill } from "@/components/ui";
@@ -17,11 +17,13 @@ export default async function QueuePage() {
       </Panel>
       <Panel className="overflow-hidden">
         <div className="divide-y divide-line">
-          {publications.length ? publications.map((publication) => (
+          {publications.length ? publications.map((publication) => {
+            const account = accounts.find((candidate) => candidate.id === publication.account_group_id);
+            return (
             <div key={publication.id} className="grid gap-3 px-4 py-4 text-sm lg:grid-cols-[150px_1fr_150px_120px_130px] lg:items-center">
-              <span>{format(new Date(publication.scheduled_at), "MMM d, HH:mm")}</span>
+              <span>{formatInTimeZone(publication.scheduled_at, account?.timezone || "Europe/Paris", "MMM d, HH:mm")}</span>
               <span className="text-muted">{videos.find((video) => video.id === publication.video_id)?.filename}</span>
-              <span>{accounts.find((account) => account.id === publication.account_group_id)?.name}</span>
+              <span>{account?.name}</span>
               <span>
                 <StatusPill status={publication.status} />
                 {publication.provider_status ? <span className="mt-1 block text-[11px] text-muted">{publication.provider_status}</span> : null}
@@ -51,7 +53,8 @@ export default async function QueuePage() {
                 ) : null}
               </span>
             </div>
-          )) : (
+            );
+          }) : (
             <div className="px-4 py-5">
               <EmptyState title="Queue vide" body="Aucune publication n'est planifiée tant que des comptes actifs, des vidéos disponibles et des templates de caption ne sont pas présents en base." />
             </div>

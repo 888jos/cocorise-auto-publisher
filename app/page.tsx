@@ -1,4 +1,4 @@
-import { format } from "date-fns";
+import { formatInTimeZone } from "date-fns-tz";
 import { AlertTriangle, PauseCircle, PlayCircle, RefreshCw, Send, Wand2 } from "lucide-react";
 import { ConfigurationWarning, EmptyState } from "@/components/empty-state";
 import { ActionButton, Metric, PageHeader, Panel, StatusPill } from "@/components/ui";
@@ -59,7 +59,7 @@ export default async function DashboardPage() {
             const video = videos.find((item) => item.id === publication.video_id);
             return (
               <div key={publication.id} className="grid gap-3 px-4 py-3 text-sm md:grid-cols-[160px_1fr_160px_120px] md:items-center">
-                <span className="text-white">{format(new Date(publication.scheduled_at), "MMM d, HH:mm")}</span>
+                <span className="text-white">{formatInTimeZone(publication.scheduled_at, account?.timezone || "Europe/Paris", "MMM d, HH:mm")}</span>
                 <span className="text-muted">{video?.filename ?? "Unknown video"}</span>
                 <span>{account?.name ?? "Unknown account"}</span>
                 <StatusPill status={publication.status} />

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { fromZonedTime } from "date-fns-tz";
 import { jsonError } from "@/lib/api";
 import { runDriveSync } from "@/lib/jobs/driveSync";
 import { publishingProvider, retryPublication, runPublisher } from "@/lib/jobs/publisher";
@@ -70,7 +71,42 @@ export async function POST(request: Request) {
       return back(request);
     }
     if (action === "pause-all") {
-      await db.from("app_settings").update({ pause_all_publishing: true }).eq("id", true);
+      await db.from("app_settings").update({ pause_all_publishing: true }).eq("id", true).throwOnError();
+      if (publishingProvider() === "upload_post") {
+        const { data: scheduledJobs, error } = await db
+          .from("publications")
+          .select("id,provider_job_id")
+          .not("provider_job_id", "is", null)
+          .in("status", ["sending", "processing"])
+          .returns<Array<{ id: string; provider_job_id: string }>>();
+        if (error) throw error;
+        for (const publication of scheduledJobs ?? []) {
+          try {
+            await cancelScheduledPost(publication.provider_job_id);
+            await db
+              .from("publications")
+              .update({
+                status: "scheduled",
+                provider_job_id: null,
+                provider_request_id: null,
+                provider_status: null,
+                error_message: null,
+                platform_results: {}
+              })
+              .eq("id", publication.id)
+              .throwOnError();
+            await db
+              .from("publication_platforms")
+              .update({ status: "pending", error_message: null, raw_status: {}, updated_at: new Date().toISOString() })
+              .eq("publication_id", publication.id)
+              .throwOnError();
+            await logAction(db, { action: "pause_cancel_upload_post_job", status: "cancelled", publicationId: publication.id });
+          } catch (error) {
+            const message = error instanceof Error ? error.message : "Unable to cancel the Upload-Post job.";
+            await logAction(db, { action: "pause_cancel_upload_post_job", status: "failed", error: message, publicationId: publication.id });
+          }
+        }
+      }
       return back(request);
     }
     if (action === "resume-all") {
@@ -186,13 +222,13 @@ export async function POST(request: Request) {
       const scheduledAt = String(form.get("scheduled_at"));
       if (!scheduledAt) return NextResponse.json({ error: "Missing scheduled_at" }, { status: 400 });
       const id = String(form.get("id"));
-      const iso = new Date(scheduledAt).toISOString();
       const { data: publication, error } = await db
         .from("publications")
         .select("provider_job_id,account_groups(timezone)")
         .eq("id", id)
         .single<{ provider_job_id: string | null; account_groups: { timezone: string } }>();
       if (error) throw error;
+      const iso = fromZonedTime(scheduledAt, publication.account_groups.timezone).toISOString();
       if (publishingProvider() === "upload_post" && publication.provider_job_id) {
         await reschedulePost(publication.provider_job_id, iso, publication.account_groups.timezone);
         await db.from("publications").update({ scheduled_at: iso, status: "processing", provider_status: "pending" }).eq("id", id);

@@ -1,4 +1,4 @@
-import { format } from "date-fns";
+import { formatInTimeZone } from "date-fns-tz";
 import { ExternalLink, Link2, Unplug } from "lucide-react";
 import { ConfigurationWarning, EmptyState } from "@/components/empty-state";
 import { PageHeader, Panel, StatusPill } from "@/components/ui";
@@ -178,7 +178,7 @@ export default async function AccountsPage({ searchParams }: { searchParams?: Pr
               ) : null}
 
               <div className="mt-4 text-sm text-muted">
-                Next post: <span className="text-white">{next ? format(new Date(next.scheduled_at), "dd MMM, HH:mm") : "None"}</span>
+                Next post: <span className="text-white">{next ? formatInTimeZone(next.scheduled_at, account.timezone, "dd MMM, HH:mm") : "None"}</span>
               </div>
               <form action="/api/actions" method="post" className="mt-4">
                 <input type="hidden" name="action" value="account-active" />
