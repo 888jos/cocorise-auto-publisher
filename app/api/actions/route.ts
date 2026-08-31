@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { randomUUID } from "node:crypto";
 import { fromZonedTime } from "date-fns-tz";
 import { jsonError } from "@/lib/api";
 import { runDriveSync } from "@/lib/jobs/driveSync";
@@ -156,9 +157,23 @@ export async function POST(request: Request) {
       if (error) throw error;
       if (!account.upload_post_profile) throw new Error("Configure an Upload-Post profile username first.");
       const appUrl = process.env.NEXT_PUBLIC_APP_URL || new URL(request.url).origin;
-      const redirectUrl = `${appUrl}/accounts?upload_post_connected=${encodeURIComponent(account.upload_post_profile)}&platform=${platform}`;
+      const connectedUrl = `${appUrl}/accounts?upload_post_connected=${encodeURIComponent(account.upload_post_profile)}&platform=${platform}`;
+      const resetToken = platform === "tiktok" ? randomUUID() : null;
+      const redirectUrl = resetToken
+        ? `${appUrl}/api/oauth/tiktok/session-reset?profile=${encodeURIComponent(account.upload_post_profile)}&token=${encodeURIComponent(resetToken)}`
+        : connectedUrl;
       const accessUrl = await createUploadPostConnectUrl(account.upload_post_profile, redirectUrl, platform);
-      return NextResponse.redirect(accessUrl, 303);
+      const response = NextResponse.redirect(accessUrl, 303);
+      if (resetToken) {
+        response.cookies.set("cocorise_tiktok_reset", resetToken, {
+          httpOnly: true,
+          secure: new URL(appUrl).protocol === "https:",
+          sameSite: "lax",
+          maxAge: 60 * 60,
+          path: "/api/oauth/tiktok/session-reset"
+        });
+      }
+      return response;
     }
     if (action === "upload-post-profile-test") {
       const accountGroupId = String(form.get("account_group_id") ?? "");

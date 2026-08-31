@@ -22,6 +22,7 @@ export default async function AccountsPage({ searchParams }: { searchParams?: Pr
   const oauthSuccess = typeof query.oauth_success === "string" ? query.oauth_success : null;
   const oauthError = typeof query.oauth_error === "string" ? query.oauth_error : null;
   const uploadPostConnected = typeof query.upload_post_connected === "string" ? query.upload_post_connected : null;
+  const tiktokSessionCleared = query.tiktok_session_cleared === "1";
 
   return (
     <>
@@ -35,6 +36,7 @@ export default async function AccountsPage({ searchParams }: { searchParams?: Pr
       {oauthSuccess ? <Panel className="mb-5 border-mint/30 bg-mint/5 p-3 text-sm text-mint">{oauthSuccess}</Panel> : null}
       {oauthError ? <Panel className="mb-5 border-danger/30 bg-danger/5 p-3 text-sm text-danger">{oauthError}</Panel> : null}
       {uploadPostConnected ? <Panel className="mb-5 border-mint/30 bg-mint/5 p-3 text-sm text-mint">Upload-Post connection flow completed for {uploadPostConnected}. Run the profile test below to verify all three platforms.</Panel> : null}
+      {tiktokSessionCleared ? <Panel className="mb-5 border-mint/30 bg-mint/5 p-3 text-sm text-mint">TikTok browser session cleared. The next TikTok connection will request a different account.</Panel> : null}
 
       <Panel className="mb-5 p-4">
         <form action="/api/actions" method="post" className={`grid gap-3 ${useUploadPost ? "lg:grid-cols-[minmax(150px,1fr)_minmax(170px,1fr)_100px_140px_repeat(3,auto)_auto]" : "lg:grid-cols-[minmax(160px,1fr)_110px_150px_repeat(3,auto)_auto]"}`}>
