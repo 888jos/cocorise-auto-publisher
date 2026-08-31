@@ -4,10 +4,12 @@ import { downloadDriveFile } from "@/lib/services/googleDrive";
 import { aggregatePlatformRows, enabledPlatforms } from "@/lib/services/social/publisher";
 import {
   getPostStatus,
+  getUploadPostProfile,
   publishVideo,
   retryPost,
   scheduleVideo,
   UploadPostApiError,
+  uploadPostSocialAccount,
   uploadPostRequestId,
   type UploadPostResult
 } from "@/lib/services/uploadPost";
@@ -47,6 +49,12 @@ async function loadPlatformRows(db: Db, publicationId: string) {
 async function preparePlatformRows(db: Db, publication: PublicationWithRelations) {
   const platforms = enabledPlatforms(publication.account_groups);
   if (!platforms.length) throw new Error(`${publication.account_groups.name} has no enabled platform.`);
+  if (!publication.account_groups.upload_post_profile) throw new Error(`${publication.account_groups.name} has no Upload-Post profile username.`);
+  const profile = (await getUploadPostProfile(publication.account_groups.upload_post_profile)).profile;
+  const missing = platforms.filter((platform) => !uploadPostSocialAccount(profile, platform));
+  if (missing.length) {
+    throw new Error(`${publication.account_groups.name} is not connected to ${missing.join(", ")} in Upload-Post.`);
+  }
   const { error } = await db.from("publication_platforms").upsert(
     platforms.map((platform) => ({ publication_id: publication.id, platform, status: "pending" })),
     { onConflict: "publication_id,platform", ignoreDuplicates: true }
@@ -84,8 +92,10 @@ export function mapUploadPostResult(result: UploadPostResult, providerStatus: st
 
   return {
     status,
-    externalPostId: String(result.platform_post_id || result.post_id || result.id || "") || null,
-    postUrl: typeof result.post_url === "string" ? result.post_url : null,
+    externalPostId: String(
+      result.platform_post_id || result.post_id || result.publish_id || result.container_id || result.video_id || result.video_reel_id || result.id || ""
+    ) || null,
+    postUrl: typeof result.post_url === "string" ? result.post_url : typeof result.url === "string" ? result.url : null,
     errorMessage,
     rawStatus: result
   };

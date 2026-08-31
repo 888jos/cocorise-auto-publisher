@@ -77,6 +77,7 @@ export async function runQueueScheduler(now = new Date()) {
         .single<Publication>();
 
       if (error) {
+        if (error.code === "23505") continue;
         await logAction(db, { action: "schedule_create", status: "skipped", error: error.message, videoId: video.id, accountGroupId: account.id });
         continue;
       }

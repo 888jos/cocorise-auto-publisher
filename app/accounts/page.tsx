@@ -3,6 +3,7 @@ import { ExternalLink, Link2, Unplug } from "lucide-react";
 import { ConfigurationWarning, EmptyState } from "@/components/empty-state";
 import { PageHeader, Panel, StatusPill } from "@/components/ui";
 import { getDashboardData } from "@/lib/data";
+import { listUploadPostProfiles, uploadPostSocialAccount } from "@/lib/services/uploadPost";
 import type { SocialPlatform } from "@/lib/types/domain";
 
 const platforms: Array<{ id: SocialPlatform; label: string; enabledKey: "tiktok_enabled" | "instagram_enabled" | "youtube_enabled" }> = [
@@ -14,6 +15,9 @@ const platforms: Array<{ id: SocialPlatform; label: string; enabledKey: "tiktok_
 export default async function AccountsPage({ searchParams }: { searchParams?: Promise<Record<string, string | string[] | undefined>> }) {
   const { accounts, publications, connections, configured, error } = await getDashboardData();
   const useUploadPost = process.env.PUBLISHING_PROVIDER !== "direct";
+  const uploadPostProfiles = useUploadPost
+    ? await listUploadPostProfiles().then((result) => result.profiles ?? []).catch(() => null)
+    : null;
   const query = (await searchParams) ?? {};
   const oauthSuccess = typeof query.oauth_success === "string" ? query.oauth_success : null;
   const oauthError = typeof query.oauth_error === "string" ? query.oauth_error : null;
@@ -66,13 +70,25 @@ export default async function AccountsPage({ searchParams }: { searchParams?: Pr
               <div className="mt-5 divide-y divide-line border-y border-line">
                 {platforms.map((platform) => {
                   const enabled = account[platform.enabledKey];
+                  const uploadPostProfile = uploadPostProfiles?.find((candidate) => candidate.username === account.upload_post_profile);
+                  const uploadPostAccount = uploadPostSocialAccount(uploadPostProfile, platform.id);
                   const connection = connections.find(
                     (candidate) => candidate.account_group_id === account.id && candidate.platform === platform.id
                   );
                   const status = !enabled
                     ? "disabled"
                     : useUploadPost
-                      ? account.upload_post_profile ? "enabled" : "profile missing"
+                      ? !account.upload_post_profile
+                        ? "profile missing"
+                        : uploadPostProfiles === null
+                          ? "status unavailable"
+                          : !uploadPostProfile
+                            ? "profile not found"
+                            : uploadPostAccount?.reauth_required
+                              ? "reauth required"
+                              : uploadPostAccount
+                                ? "connected"
+                                : "not connected"
                       : connection?.status || "not connected";
                   return (
                     <div key={platform.id} className="py-3">
@@ -81,7 +97,9 @@ export default async function AccountsPage({ searchParams }: { searchParams?: Pr
                           <p className="text-sm font-medium text-white">{platform.label}</p>
                           <p className="mt-1 truncate text-xs text-muted">
                             {useUploadPost
-                              ? account.upload_post_profile ? `Managed by ${account.upload_post_profile}` : "Upload-Post profile required"
+                              ? uploadPostAccount
+                                ? `${uploadPostAccount.handle || uploadPostAccount.username || uploadPostAccount.display_name || platform.label} · ${account.upload_post_profile}`
+                                : account.upload_post_profile || "Upload-Post profile required"
                               : connection?.external_username || connection?.external_account_id || "No OAuth account"}
                           </p>
                         </div>

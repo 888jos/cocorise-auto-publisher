@@ -1,4 +1,5 @@
 import { addDays, differenceInCalendarDays, isAfter, parseISO, set } from "date-fns";
+import { formatInTimeZone, fromZonedTime, toZonedTime } from "date-fns-tz";
 import type { AccountGroup, CaptionTemplate, Publication, SchedulerSettings, Video } from "@/lib/types/domain";
 
 export function stableHash(input: string) {
@@ -25,9 +26,10 @@ export function slotForAccount(account: AccountGroup, day: Date, windowIndex: nu
   const end = minutesFromTime(window.end);
   const span = Math.max(1, end - start);
   const spread = Math.max(0, settings.maxStaggerMinutes - settings.minStaggerMinutes);
-  const seed = stableHash(`${account.id}:${day.toISOString().slice(0, 10)}:${window.name}`);
+  const timezone = account.timezone || settings.timezone;
+  const seed = stableHash(`${account.id}:${formatInTimeZone(day, timezone, "yyyy-MM-dd")}:${window.name}`);
   const offset = settings.minStaggerMinutes + (seed % Math.max(1, Math.min(span, spread + 1)));
-  return dateWithMinutes(day, Math.min(end - 1, start + offset));
+  return fromZonedTime(dateWithMinutes(toZonedTime(day, timezone), Math.min(end - 1, start + offset)), timezone);
 }
 
 export function generateAccountSlots(account: AccountGroup, start: Date, days: number, settings: SchedulerSettings) {

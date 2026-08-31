@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { mapUploadPostResult } from "@/lib/jobs/uploadPostPublisher";
-import { buildUploadPostForm, uploadPostIdempotencyKey, uploadPostRequestId } from "@/lib/services/uploadPost";
+import {
+  buildUploadPostForm,
+  uploadPostIdempotencyKey,
+  uploadPostRequestId,
+  uploadPostSocialAccount
+} from "@/lib/services/uploadPost";
 
 describe("Upload-Post publishing contract", () => {
   it("builds a real multipart upload for every enabled platform", () => {
@@ -54,5 +59,24 @@ describe("Upload-Post publishing contract", () => {
         "completed"
       )
     ).toMatchObject({ status: "published", externalPostId: "ig-123", postUrl: "https://instagram.com/reel/ig-123", errorMessage: null });
+  });
+
+  it("maps the current provider URL and video identifier fields", () => {
+    expect(
+      mapUploadPostResult(
+        { platform: "youtube", status: "completed", success: true, video_id: "yt-123", url: "https://youtube.com/shorts/yt-123" },
+        "completed"
+      )
+    ).toMatchObject({ status: "published", externalPostId: "yt-123", postUrl: "https://youtube.com/shorts/yt-123" });
+  });
+
+  it("only treats object-valued social account entries as connected", () => {
+    const profile = {
+      username: "cocorise_01",
+      social_accounts: { instagram: { handle: "lea.cocorise" }, tiktok: null }
+    };
+    expect(uploadPostSocialAccount(profile, "instagram")).toMatchObject({ handle: "lea.cocorise" });
+    expect(uploadPostSocialAccount(profile, "tiktok")).toBeNull();
+    expect(uploadPostSocialAccount(profile, "youtube")).toBeNull();
   });
 });

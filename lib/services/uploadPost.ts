@@ -8,6 +8,13 @@ export type UploadPostProfile = {
   social_accounts?: Partial<Record<SocialPlatform, unknown>>;
 };
 
+export type UploadPostSocialAccount = {
+  display_name?: string;
+  handle?: string;
+  username?: string;
+  reauth_required?: boolean;
+};
+
 export type UploadPostResult = {
   platform: string;
   status?: string;
@@ -18,7 +25,12 @@ export type UploadPostResult = {
   error?: string;
   message?: string;
   post_url?: string | null;
+  url?: string | null;
   platform_post_id?: string | null;
+  publish_id?: string | null;
+  container_id?: string | null;
+  video_id?: string | null;
+  video_reel_id?: string | null;
   post_id?: string | null;
   id?: string | null;
   [key: string]: unknown;
@@ -84,6 +96,11 @@ async function uploadPostRequest<T>(path: string, init: RequestInit = {}) {
 
 export async function listUploadPostProfiles() {
   return uploadPostRequest<{ success: boolean; limit?: number; plan?: string; profiles: UploadPostProfile[] }>("/uploadposts/users");
+}
+
+export function uploadPostSocialAccount(profile: UploadPostProfile | undefined, platform: SocialPlatform) {
+  const value = profile?.social_accounts?.[platform];
+  return value && typeof value === "object" ? (value as UploadPostSocialAccount) : null;
 }
 
 export async function getUploadPostProfile(username: string) {

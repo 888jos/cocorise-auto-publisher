@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { addHours } from "date-fns";
+import { formatInTimeZone } from "date-fns-tz";
 import { defaultSchedulerSettings } from "@/lib/config";
 import {
   chooseCaptionTemplate,
@@ -112,8 +113,11 @@ describe("scheduling rules", () => {
     const [first] = generateAccountSlots(account, day, 1, defaultSchedulerSettings);
     const [second] = generateAccountSlots(accountTwo, day, 1, defaultSchedulerSettings);
     expect(first.getTime()).not.toBe(second.getTime());
-    expect(first.getHours()).toBeGreaterThanOrEqual(9);
-    expect(first.getHours()).toBeLessThanOrEqual(10);
+    expect(formatInTimeZone(first, account.timezone, "yyyy-MM-dd")).toBe("2026-08-26");
+    expect(Number(formatInTimeZone(first, account.timezone, "HH"))).toBeGreaterThanOrEqual(9);
+    expect(Number(formatInTimeZone(first, account.timezone, "HH"))).toBeLessThanOrEqual(10);
+    expect(first.getUTCHours()).toBeGreaterThanOrEqual(7);
+    expect(first.getUTCHours()).toBeLessThanOrEqual(8);
   });
 
   it("keeps the requested queue horizon", () => {

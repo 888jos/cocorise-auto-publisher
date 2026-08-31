@@ -34,9 +34,10 @@ export function Metric({ label, value, detail, tone = "neutral" }: { label: stri
 }
 
 export function StatusPill({ status }: { status: string }) {
-  const color = status.includes("failed")
+  const normalized = status.toLowerCase();
+  const color = ["failed", "error", "not connected", "missing", "expired", "revoked", "not found"].some((value) => normalized.includes(value))
     ? "border-danger/30 bg-danger/10 text-danger"
-    : status.includes("published") || status.includes("active") || status.includes("available") || status.includes("connected") || status.includes("configured")
+    : normalized.includes("published") || normalized.includes("active") || normalized.includes("available") || normalized === "connected" || normalized.includes("configured")
       ? "border-mint/30 bg-mint/10 text-mint"
       : "border-amber/30 bg-amber/10 text-amber";
   return <span className={clsx("inline-flex rounded px-2 py-1 text-xs font-medium", color)}>{status.replace("_", " ")}</span>;
