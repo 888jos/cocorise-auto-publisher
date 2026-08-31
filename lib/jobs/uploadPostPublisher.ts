@@ -7,7 +7,6 @@ import {
   getUploadPostProfile,
   publishVideo,
   retryPost,
-  scheduleVideo,
   UploadPostApiError,
   uploadPostSocialAccount,
   uploadPostRequestId,
@@ -235,7 +234,6 @@ async function submitPublication(db: Db, item: PublicationWithRelations, now: Da
 
   try {
     const binary = await downloadDriveFile(item.videos.drive_file_id);
-    const scheduled = new Date(item.scheduled_at).getTime() > now.getTime() + 2 * 60_000;
     const request = {
       profile: item.account_groups.upload_post_profile!,
       platforms: enabledPlatforms(item.account_groups),
@@ -246,9 +244,7 @@ async function submitPublication(db: Db, item: PublicationWithRelations, now: Da
       buffer: binary.buffer,
       timezone: item.account_groups.timezone
     };
-    const response = scheduled
-      ? await scheduleVideo({ ...request, scheduledAt: item.scheduled_at })
-      : await publishVideo(request);
+    const response = await publishVideo(request);
     const providerStatus = String(response.status || (response.job_id ? "pending" : "queued"));
     await db
       .from("publication_platforms")
@@ -266,7 +262,7 @@ async function submitPublication(db: Db, item: PublicationWithRelations, now: Da
       })
       .eq("id", item.id);
     await logAction(db, {
-      action: response.job_id ? "upload_post_scheduled" : "upload_post_submitted",
+      action: "upload_post_submitted",
       status: providerStatus,
       videoId: item.video_id,
       accountGroupId: item.account_group_id,
@@ -420,7 +416,14 @@ export async function runUploadPostPublisher(now = new Date()) {
   if (settings?.pause_all_publishing) return { sent: 0, checked: 0, paused: true, provider: "upload_post" as const };
 
   const [scheduledQuery, failedQuery] = await Promise.all([
-    db.from("publications").select("*, videos(*), account_groups(*)").eq("status", "scheduled").order("scheduled_at").limit(20),
+    db
+      .from("publications")
+      .select("*, videos(*), account_groups!inner(*)")
+      .eq("status", "scheduled")
+      .eq("account_groups.active", true)
+      .lte("scheduled_at", now.toISOString())
+      .order("scheduled_at")
+      .limit(20),
     db
       .from("publications")
       .select("*")

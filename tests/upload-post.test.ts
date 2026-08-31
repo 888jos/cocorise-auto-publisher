@@ -29,6 +29,22 @@ describe("Upload-Post publishing contract", () => {
     expect(form.get("video")).toBeInstanceOf(Blob);
   });
 
+  it("submits due publications immediately instead of creating expiring remote schedules", () => {
+    const form = buildUploadPostForm({
+      profile: "cocorise_01",
+      platforms: ["tiktok"],
+      caption: "Cocorise",
+      publicationId: "publication-due",
+      filename: "clip.mp4",
+      mimeType: "video/mp4",
+      buffer: Buffer.from("video-bytes"),
+      timezone: "Europe/Paris"
+    });
+
+    expect(form.get("scheduled_date")).toBeNull();
+    expect(form.get("async_upload")).toBe("true");
+  });
+
   it("uses stable request and idempotency identifiers", () => {
     expect(uploadPostRequestId("publication-1")).toBe("cocorise-publication-1");
     expect(uploadPostIdempotencyKey("publication-1")).toBe("cocorise-publication-publication-1");
