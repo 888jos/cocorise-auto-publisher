@@ -57,8 +57,8 @@ export function telegramStatsDays(text: string) {
 }
 
 export function telegramAnalyticsDays(text: string) {
-  const value = Number.parseInt(text.trim().split(/\s+/)[1] || "7", 10);
-  return Number.isFinite(value) ? Math.min(30, Math.max(1, value)) : 7;
+  const value = Number.parseInt(text.trim().split(/\s+/)[1] || "1", 10);
+  return Number.isFinite(value) ? Math.min(5, Math.max(1, value)) : 1;
 }
 
 export function platformStatusCounts(rows: PlatformStatusRow[]) {
@@ -112,8 +112,8 @@ function helpMessage() {
     "/stats — stats des 7 derniers jours",
     "/stats 30 — stats des 30 derniers jours",
     "/today — résultats du jour",
-    "/analytics — engagement des 7 derniers jours",
-    "/analytics 1 — vues, likes et commentaires du jour",
+    "/analytics — vues, likes et commentaires du jour",
+    "/analytics 5 — engagement par jour sur 5 jours",
     "/content — stock de vidéos Drive",
     "/accounts — état des comptes",
     "/queue — 5 prochaines publications",

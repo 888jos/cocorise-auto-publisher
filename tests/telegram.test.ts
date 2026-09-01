@@ -118,9 +118,9 @@ describe("Telegram notifications", () => {
   });
 
   it("supports bounded analytics periods", () => {
-    expect(telegramAnalyticsDays("/analytics")).toBe(7);
+    expect(telegramAnalyticsDays("/analytics")).toBe(1);
     expect(telegramAnalyticsDays("/analytics 1")).toBe(1);
-    expect(telegramAnalyticsDays("/analytics 999")).toBe(30);
+    expect(telegramAnalyticsDays("/analytics 999")).toBe(5);
   });
 
   it("counts confirmed social posts separately from video jobs", () => {
