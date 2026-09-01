@@ -26,7 +26,7 @@ type PublicationContext = {
   platforms: PublicationPlatform[];
 };
 
-type TelegramButton = { text: string; url: string };
+export type TelegramButton = { text: string; url?: string; callback_data?: string };
 
 const platformLabels: Record<SocialPlatform, string> = {
   tiktok: "TikTok",
@@ -136,6 +136,22 @@ export async function sendTelegramMessage(text: string, options?: { chatId?: str
     throw new Error(data?.description || `Telegram sendMessage failed with HTTP ${response.status}.`);
   }
   return data.result?.message_id ?? null;
+}
+
+export async function answerTelegramCallbackQuery(callbackQueryId: string, text?: string) {
+  const { token } = getTelegramConfig();
+  if (!token) throw new Error("Telegram bot token is not configured.");
+
+  const response = await fetch(`https://api.telegram.org/bot${token}/answerCallbackQuery`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ callback_query_id: callbackQueryId, text }),
+    signal: AbortSignal.timeout(10_000)
+  });
+  const data = (await response.json().catch(() => null)) as TelegramApiResponse | null;
+  if (!response.ok || !data?.ok) {
+    throw new Error(data?.description || `Telegram answerCallbackQuery failed with HTTP ${response.status}.`);
+  }
 }
 
 async function loadPublicationContext(db: Db, publicationId: string): Promise<PublicationContext> {

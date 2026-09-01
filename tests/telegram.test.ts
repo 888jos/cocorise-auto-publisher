@@ -6,6 +6,8 @@ import {
   platformStatusCounts,
   telegramAnalyticsDays,
   telegramAnalyticsRange,
+  telegramCallbackCommand,
+  telegramCommandButtons,
   telegramCommands,
   telegramStatsDays
 } from "@/lib/services/telegramCommands";
@@ -134,6 +136,18 @@ describe("Telegram notifications", () => {
     expect(telegramAnalyticsRange("/analytics last7", timezone, now).label).toBe("7 derniers jours");
     expect(telegramAnalyticsRange("/analytics last30", timezone, now).label).toBe("30 derniers jours");
     expect(telegramAnalyticsRange("/analytics custom 2026-09-01 2026-09-02", timezone, now).label).toBe("01/09/2026 - 02/09/2026");
+  });
+
+  it("exposes analytics period buttons and callback commands", () => {
+    expect(telegramCommandButtons("/analytics")?.map((button) => button.callback_data)).toEqual([
+      "analytics:last24",
+      "analytics:today",
+      "analytics:yesterday",
+      "analytics:last7",
+      "analytics:last30"
+    ]);
+    expect(telegramCallbackCommand("analytics:last30")).toBe("/analytics last30");
+    expect(telegramCallbackCommand("accounts:last30")).toBeNull();
   });
 
   it("counts confirmed social posts separately from video jobs", () => {

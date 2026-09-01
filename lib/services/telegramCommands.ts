@@ -1,6 +1,6 @@
 import { addDays, differenceInCalendarDays, subDays, subHours } from "date-fns";
 import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
-import { escapeTelegramHtml } from "@/lib/services/telegram";
+import { escapeTelegramHtml, type TelegramButton } from "@/lib/services/telegram";
 import { getPostAnalytics, type UploadPostPostAnalytics } from "@/lib/services/uploadPost";
 import { createServiceClient } from "@/lib/supabase/server";
 import type { AccountGroup, PublicationStatus, SocialPlatform, VideoStatus } from "@/lib/types/domain";
@@ -33,6 +33,13 @@ type AnalyticsTotals = {
 
 const socialPlatforms: SocialPlatform[] = ["tiktok", "instagram", "youtube"];
 const emptyAnalyticsTotals = (): AnalyticsTotals => ({ posts: 0, views: 0, likes: 0, comments: 0, saves: 0, shares: 0 });
+const analyticsButtons: TelegramButton[] = [
+  { text: "24h", callback_data: "analytics:last24" },
+  { text: "Aujourd'hui", callback_data: "analytics:today" },
+  { text: "Hier", callback_data: "analytics:yesterday" },
+  { text: "7 jours", callback_data: "analytics:last7" },
+  { text: "30 jours", callback_data: "analytics:last30" }
+];
 
 export const telegramCommands = [
   { command: "status", description: "État de l’auto-publication" },
@@ -49,6 +56,18 @@ export const telegramCommands = [
 
 export function normalizeTelegramCommand(text: string) {
   return text.trim().split(/\s+/)[0].toLowerCase().replace(/@[^\s]+$/, "");
+}
+
+export function telegramCallbackCommand(data: string) {
+  const [scope, period] = data.split(":");
+  if (scope !== "analytics") return null;
+  if (!["last24", "today", "yesterday", "last7", "last30"].includes(period)) return null;
+  return `/analytics ${period}`;
+}
+
+export function telegramCommandButtons(text: string): TelegramButton[] | undefined {
+  const command = normalizeTelegramCommand(text);
+  return command === "/analytics" ? analyticsButtons : undefined;
 }
 
 export function telegramStatsDays(text: string) {
