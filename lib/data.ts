@@ -32,8 +32,8 @@ export async function getDashboardData(): Promise<DashboardData> {
     const [videos, accounts, publications, publicationPlatforms, connections, captions, logs, settings] = await Promise.all([
       db.from("videos").select("*").order("imported_at", { ascending: false }).limit(100),
       db.from("account_groups").select("*").order("name").limit(20),
-      db.from("publications").select("*").order("scheduled_at", { ascending: true }).limit(200),
-      db.from("publication_platforms").select("*").order("created_at", { ascending: false }).limit(600),
+      db.from("publications").select("*").order("scheduled_at", { ascending: false }).limit(10000),
+      db.from("publication_platforms").select("*").order("created_at", { ascending: false }).limit(10000),
       db
         .from("social_connections")
         .select("id,account_group_id,platform,status,external_account_id,external_username,access_token_expires_at,refresh_token_expires_at,scopes,metadata,last_error,connected_at,updated_at")
