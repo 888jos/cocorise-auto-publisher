@@ -76,7 +76,8 @@ export function telegramStatsDays(text: string) {
 }
 
 export function telegramAnalyticsDays(text: string) {
-  const value = Number.parseInt(text.trim().split(/\s+/)[1] || "1", 10);
+  const parts = text.trim().split(/\s+/);
+  const value = Number.parseInt(parts[1] === "last" ? parts[2] || "1" : parts[1] || "1", 10);
   return Number.isFinite(value) ? Math.min(30, Math.max(1, value)) : 1;
 }
 
@@ -115,6 +116,16 @@ export function telegramAnalyticsRange(text: string, timezone: string, now = new
   if (["last30", "30d", "month", "mois"].includes(period)) {
     const start = fromZonedTime(`${formatInTimeZone(subDays(todayStart, 29), timezone, "yyyy-MM-dd")}T00:00:00`, timezone);
     return { start, end: tomorrowStart, label: "30 derniers jours" };
+  }
+
+  const compactLastMatch = period.match(/^last(\d{1,2})$/);
+  if (compactLastMatch || period === "last") {
+    const value = Number.parseInt(compactLastMatch?.[1] || parts[2] || "", 10);
+    if (Number.isFinite(value)) {
+      const days = Math.min(30, Math.max(1, value));
+      const start = fromZonedTime(`${formatInTimeZone(subDays(todayStart, days - 1), timezone, "yyyy-MM-dd")}T00:00:00`, timezone);
+      return { start, end: tomorrowStart, label: `${days} dernier${days > 1 ? "s" : ""} jour${days > 1 ? "s" : ""}` };
+    }
   }
 
   const customStart = period === "custom" ? parts[2] : parts[1];
@@ -177,6 +188,17 @@ function analyticsLine(label: string, totals: AnalyticsTotals) {
   return `${label} : <b>${totals.posts}</b> post${totals.posts > 1 ? "s" : ""} · ${totals.views} vues · ${totals.likes} likes · ${totals.comments} com. · ${totals.saves} sauv. · ${totals.shares} part.`;
 }
 
+function analyticsSummaryLines(totals: Record<SocialPlatform, AnalyticsTotals>) {
+  const all = emptyAnalyticsTotals();
+  for (const platform of socialPlatforms) addAnalytics(all, totals[platform]);
+  return [
+    `<b>Total période</b> — ${all.posts} posts · <b>${all.views} vues</b> · ${all.likes} likes · ${all.comments} com. · ${all.saves} sauv. · ${all.shares} part.`,
+    analyticsLine("TikTok", totals.tiktok),
+    analyticsLine("Instagram", totals.instagram),
+    analyticsLine("YouTube", totals.youtube)
+  ];
+}
+
 function helpMessage() {
   return [
     "<b>Cocorise Auto Publisher</b>",
@@ -192,6 +214,7 @@ function helpMessage() {
     "/analytics yesterday — performance d’hier",
     "/analytics last7 — engagement sur 7 jours",
     "/analytics last30 — engagement sur 30 jours",
+    "/analytics last 12 — engagement sur X jours, max 30",
     "/analytics custom 2026-09-01 2026-09-07 — période custom",
     "/content — stock de vidéos Drive",
     "/accounts — état des comptes",
@@ -345,6 +368,7 @@ export async function telegramCommandReply(text: string, now = new Date()) {
     if (!data?.length) return `Aucun post publié sur la période ${escapeTelegramHtml(range.label)}.`;
 
     const daily = new Map<string, Record<SocialPlatform, AnalyticsTotals>>();
+    const total = Object.fromEntries(socialPlatforms.map((platform) => [platform, emptyAnalyticsTotals()])) as Record<SocialPlatform, AnalyticsTotals>;
     let unavailable = 0;
     for (let index = 0; index < data.length; index += 5) {
       const batch = data.slice(index, index + 5);
@@ -361,7 +385,10 @@ export async function telegramCommandReply(text: string, now = new Date()) {
         const day = formatInTimeZone(result.publication.published_at, timezone, "dd/MM/yyyy");
         const totals = daily.get(day) ?? Object.fromEntries(socialPlatforms.map((platform) => [platform, emptyAnalyticsTotals()])) as Record<SocialPlatform, AnalyticsTotals>;
         const postTotals = analyticsTotals(result.response);
-        for (const platform of socialPlatforms) addAnalytics(totals[platform], postTotals[platform]);
+        for (const platform of socialPlatforms) {
+          addAnalytics(totals[platform], postTotals[platform]);
+          addAnalytics(total[platform], postTotals[platform]);
+        }
         daily.set(day, totals);
       }
     }
@@ -382,6 +409,9 @@ export async function telegramCommandReply(text: string, now = new Date()) {
       `${escapeTelegramHtml(formatInTimeZone(range.start, timezone, "dd/MM HH:mm"))} - ${escapeTelegramHtml(formatInTimeZone(range.end, timezone, "dd/MM HH:mm"))}`,
       "Mesures cumulées à maintenant, regroupées selon le jour de publication.",
       "",
+      ...analyticsSummaryLines(total),
+      "",
+      "<b>Détail par jour</b>",
       ...rows,
       unavailable ? `Données indisponibles pour ${unavailable} job${unavailable > 1 ? "s" : ""}.` : ""
     ].join("\n").trim();

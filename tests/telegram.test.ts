@@ -123,6 +123,7 @@ describe("Telegram notifications", () => {
   it("supports bounded analytics periods", () => {
     expect(telegramAnalyticsDays("/analytics")).toBe(1);
     expect(telegramAnalyticsDays("/analytics 1")).toBe(1);
+    expect(telegramAnalyticsDays("/analytics last 12")).toBe(12);
     expect(telegramAnalyticsDays("/analytics 999")).toBe(30);
   });
 
@@ -135,6 +136,8 @@ describe("Telegram notifications", () => {
     expect(telegramAnalyticsRange("/analytics yesterday", timezone, now).label).toBe("hier");
     expect(telegramAnalyticsRange("/analytics last7", timezone, now).label).toBe("7 derniers jours");
     expect(telegramAnalyticsRange("/analytics last30", timezone, now).label).toBe("30 derniers jours");
+    expect(telegramAnalyticsRange("/analytics last 12", timezone, now).label).toBe("12 derniers jours");
+    expect(telegramAnalyticsRange("/analytics last12", timezone, now).label).toBe("12 derniers jours");
     expect(telegramAnalyticsRange("/analytics custom 2026-09-01 2026-09-02", timezone, now).label).toBe("01/09/2026 - 02/09/2026");
   });
 
