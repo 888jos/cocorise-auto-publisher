@@ -1,4 +1,4 @@
-import { addDays, subDays } from "date-fns";
+import { addDays, differenceInCalendarDays, subDays, subHours } from "date-fns";
 import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
 import { escapeTelegramHtml } from "@/lib/services/telegram";
 import { getPostAnalytics, type UploadPostPostAnalytics } from "@/lib/services/uploadPost";
@@ -58,7 +58,63 @@ export function telegramStatsDays(text: string) {
 
 export function telegramAnalyticsDays(text: string) {
   const value = Number.parseInt(text.trim().split(/\s+/)[1] || "1", 10);
-  return Number.isFinite(value) ? Math.min(5, Math.max(1, value)) : 1;
+  return Number.isFinite(value) ? Math.min(30, Math.max(1, value)) : 1;
+}
+
+function localDayStart(date: Date, timezone: string) {
+  return fromZonedTime(`${formatInTimeZone(date, timezone, "yyyy-MM-dd")}T00:00:00`, timezone);
+}
+
+function parseLocalDate(value: string | undefined, timezone: string) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(value ?? "") ? fromZonedTime(`${value}T00:00:00`, timezone) : null;
+}
+
+export function telegramAnalyticsRange(text: string, timezone: string, now = new Date()) {
+  const parts = text.trim().split(/\s+/);
+  const period = (parts[1] || "today").toLowerCase();
+  const todayStart = localDayStart(now, timezone);
+  const tomorrowStart = fromZonedTime(`${formatInTimeZone(addDays(todayStart, 1), timezone, "yyyy-MM-dd")}T00:00:00`, timezone);
+
+  if (["last24", "24h", "last-24-hours"].includes(period)) {
+    return { start: subHours(now, 24), end: now, label: "24 dernières heures" };
+  }
+
+  if (["today", "jour", "aujourdhui", "aujourd'hui"].includes(period)) {
+    return { start: todayStart, end: tomorrowStart, label: "aujourd'hui" };
+  }
+
+  if (["yesterday", "hier"].includes(period)) {
+    const start = fromZonedTime(`${formatInTimeZone(subDays(todayStart, 1), timezone, "yyyy-MM-dd")}T00:00:00`, timezone);
+    return { start, end: todayStart, label: "hier" };
+  }
+
+  if (["last7", "7d", "week", "semaine"].includes(period)) {
+    const start = fromZonedTime(`${formatInTimeZone(subDays(todayStart, 6), timezone, "yyyy-MM-dd")}T00:00:00`, timezone);
+    return { start, end: tomorrowStart, label: "7 derniers jours" };
+  }
+
+  if (["last30", "30d", "month", "mois"].includes(period)) {
+    const start = fromZonedTime(`${formatInTimeZone(subDays(todayStart, 29), timezone, "yyyy-MM-dd")}T00:00:00`, timezone);
+    return { start, end: tomorrowStart, label: "30 derniers jours" };
+  }
+
+  const customStart = period === "custom" ? parts[2] : parts[1];
+  const customEnd = period === "custom" ? parts[3] : parts[2];
+  const customStartDate = parseLocalDate(customStart, timezone);
+  const endStart = parseLocalDate(customEnd, timezone);
+  if (customStartDate && endStart && endStart >= customStartDate) {
+    const cappedEndStart = differenceInCalendarDays(endStart, customStartDate) > 30 ? addDays(customStartDate, 30) : endStart;
+    const end = fromZonedTime(`${formatInTimeZone(addDays(cappedEndStart, 1), timezone, "yyyy-MM-dd")}T00:00:00`, timezone);
+    return {
+      start: customStartDate,
+      end,
+      label: `${formatInTimeZone(customStartDate, timezone, "dd/MM/yyyy")} - ${formatInTimeZone(cappedEndStart, timezone, "dd/MM/yyyy")}`
+    };
+  }
+
+  const days = telegramAnalyticsDays(text);
+  const start = fromZonedTime(`${formatInTimeZone(subDays(todayStart, days - 1), timezone, "yyyy-MM-dd")}T00:00:00`, timezone);
+  return { start, end: tomorrowStart, label: `${days} dernier${days > 1 ? "s" : ""} jour${days > 1 ? "s" : ""}` };
 }
 
 export function platformStatusCounts(rows: PlatformStatusRow[]) {
@@ -113,7 +169,11 @@ function helpMessage() {
     "/stats 30 — stats des 30 derniers jours",
     "/today — résultats du jour",
     "/analytics — vues, likes et commentaires du jour",
-    "/analytics 5 — engagement par jour sur 5 jours",
+    "/analytics last24 — performance des 24 dernières heures",
+    "/analytics yesterday — performance d’hier",
+    "/analytics last7 — engagement sur 7 jours",
+    "/analytics last30 — engagement sur 30 jours",
+    "/analytics custom 2026-09-01 2026-09-07 — période custom",
     "/content — stock de vidéos Drive",
     "/accounts — état des comptes",
     "/queue — 5 prochaines publications",
@@ -251,24 +311,19 @@ export async function telegramCommandReply(text: string, now = new Date()) {
     if (process.env.PUBLISHING_PROVIDER === "direct") {
       return "Les analytics Telegram nécessitent actuellement le fournisseur Upload-Post.";
     }
-    const days = telegramAnalyticsDays(text);
-    const localDate = formatInTimeZone(now, timezone, "yyyy-MM-dd");
-    const startDate = formatInTimeZone(subDays(fromZonedTime(`${localDate}T00:00:00`, timezone), days - 1), timezone, "yyyy-MM-dd");
-    const start = fromZonedTime(`${startDate}T00:00:00`, timezone);
-    const nextDate = formatInTimeZone(addDays(fromZonedTime(`${localDate}T00:00:00`, timezone), 1), timezone, "yyyy-MM-dd");
-    const end = fromZonedTime(`${nextDate}T00:00:00`, timezone);
+    const range = telegramAnalyticsRange(text, timezone, now);
     const { data, error } = await db
       .from("publications")
       .select("provider_request_id,published_at")
       .eq("status", "published")
       .not("provider_request_id", "is", null)
-      .gte("published_at", start.toISOString())
-      .lt("published_at", end.toISOString())
+      .gte("published_at", range.start.toISOString())
+      .lt("published_at", range.end.toISOString())
       .order("published_at")
-      .limit(75)
+      .limit(500)
       .returns<Array<{ provider_request_id: string; published_at: string }>>();
     if (error) throw error;
-    if (!data?.length) return `Aucun post publié pendant les ${days} dernier${days > 1 ? "s" : ""} jour${days > 1 ? "s" : ""}.`;
+    if (!data?.length) return `Aucun post publié sur la période ${escapeTelegramHtml(range.label)}.`;
 
     const daily = new Map<string, Record<SocialPlatform, AnalyticsTotals>>();
     let unavailable = 0;
@@ -304,7 +359,8 @@ export async function telegramCommandReply(text: string, now = new Date()) {
       ];
     });
     return [
-      `📈 <b>Performance live — ${days} jour${days > 1 ? "s" : ""}</b>`,
+      `📈 <b>Performance live — ${escapeTelegramHtml(range.label)}</b>`,
+      `${escapeTelegramHtml(formatInTimeZone(range.start, timezone, "dd/MM HH:mm"))} - ${escapeTelegramHtml(formatInTimeZone(range.end, timezone, "dd/MM HH:mm"))}`,
       "Mesures cumulées à maintenant, regroupées selon le jour de publication.",
       "",
       ...rows,

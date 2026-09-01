@@ -8,12 +8,13 @@ async function signIn(formData: FormData) {
   const email = String(formData.get("email") ?? "");
   const password = String(formData.get("password") ?? "");
   const next = String(formData.get("next") ?? "/");
+  const safeNext = next.startsWith("/") ? next : "/";
   const supabase = await createAuthClient();
-  if (!supabase) redirect("/login?error=missing-config");
+  if (!supabase) redirect(`/login?next=${encodeURIComponent(safeNext)}&error=missing-config`);
 
   const { error } = await supabase.auth.signInWithPassword({ email, password });
-  if (error) redirect(`/login?error=${encodeURIComponent(error.message)}`);
-  redirect(next.startsWith("/") ? next : "/");
+  if (error) redirect(`/login?next=${encodeURIComponent(safeNext)}&error=${encodeURIComponent(error.message)}`);
+  redirect(safeNext);
 }
 
 export default async function LoginPage({ searchParams }: { searchParams: Promise<{ next?: string; error?: string }> }) {
