@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { buildPublicationTelegramMessage, escapeTelegramHtml, sendTelegramMessage } from "@/lib/services/telegram";
-import { normalizeTelegramCommand } from "@/lib/services/telegramCommands";
+import { normalizeTelegramCommand, telegramCommands, telegramStatsDays } from "@/lib/services/telegramCommands";
 import type { Publication, PublicationPlatform } from "@/lib/types/domain";
 
 const publication: Publication = {
@@ -101,6 +101,27 @@ describe("Telegram notifications", () => {
 
   it("normalizes commands addressed to the bot", () => {
     expect(normalizeTelegramCommand("/STATUS@CocoriseBot now")).toBe("/status");
+  });
+
+  it("supports bounded statistics periods", () => {
+    expect(telegramStatsDays("/stats")).toBe(7);
+    expect(telegramStatsDays("/stats 30")).toBe(30);
+    expect(telegramStatsDays("/stats 999")).toBe(90);
+    expect(telegramStatsDays("/stats nope")).toBe(7);
+  });
+
+  it("exposes every operational command in the Telegram menu", () => {
+    expect(telegramCommands.map(({ command }) => command)).toEqual([
+      "status",
+      "stats",
+      "today",
+      "content",
+      "accounts",
+      "queue",
+      "next",
+      "failures",
+      "help"
+    ]);
   });
 
   it("escapes every HTML control character used by Telegram", () => {
