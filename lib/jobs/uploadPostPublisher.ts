@@ -147,7 +147,7 @@ async function reconcilePublication(db: Db, publicationId: string, now: Date) {
     return aggregate;
   }
 
-  const canRetry = publication.retry_count < 3 && rows.some((row) => row.status === "failed");
+  const canRetry = rows.some((row) => row.status === "failed");
   const retryAt = canRetry ? nextRetryAt(now, publication.retry_count) : null;
   await db
     .from("publications")
@@ -373,8 +373,6 @@ export async function retryUploadPostPublication(publicationId: string) {
   const { data: publication, error } = await db.from("publications").select("*").eq("id", publicationId).single<Publication>();
   if (error) throw error;
   if (publication.status !== "failed") throw new Error("Only a failed publication can be retried.");
-  if (publication.retry_count >= 3) throw new Error("This publication has already reached the maximum of 3 retries.");
-
   if (!publication.provider_request_id && !publication.provider_job_id) {
     await db
       .from("publications")
@@ -446,7 +444,6 @@ export async function runUploadPostPublisher(now = new Date()) {
 
   let sent = 0;
   for (const publication of failedQuery.data ?? []) {
-    if (publication.retry_count >= 3) continue;
     await retryUploadPostPublication(publication.id);
     sent += 1;
   }

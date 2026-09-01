@@ -1,6 +1,6 @@
 import { logAction } from "@/lib/logger";
 import { retryUploadPostPublication, runUploadPostPublisher } from "@/lib/jobs/uploadPostPublisher";
-import { nextRetryAt, shouldPauseAccount } from "@/lib/scheduling";
+import { nextRetryAt } from "@/lib/scheduling";
 import { downloadDriveFile } from "@/lib/services/googleDrive";
 import { notifyPublication, retryPendingTelegramNotifications } from "@/lib/services/telegram";
 import { getValidSocialConnection } from "@/lib/services/social/connections";
@@ -87,7 +87,7 @@ async function reconcilePublication(db: Db, publicationId: string, now: Date) {
 
   const retryCount = publication.retry_count + 1;
   const canRetry = rows.some(
-    (row) => row.status === "failed" && row.attempt_count < 3 && !(row.platform === "youtube" && row.external_post_id)
+    (row) => row.status === "failed" && !(row.platform === "youtube" && row.external_post_id)
   );
   const retryAt = canRetry ? nextRetryAt(now, publication.retry_count) : null;
   await db
@@ -107,20 +107,6 @@ async function reconcilePublication(db: Db, publicationId: string, now: Date) {
     await db.from("videos").update({ status: "partially_published" }).eq("id", publication.video_id);
   }
 
-  if (publication.status !== "failed") {
-    const { data: account } = await db.from("account_groups").select("active,consecutive_failures").eq("id", publication.account_group_id).single();
-    const failures = Number(account?.consecutive_failures ?? 0) + 1;
-    const { data: settings } = await db.from("app_settings").select("failure_pause_threshold").eq("id", true).maybeSingle();
-    const pause = shouldPauseAccount(failures, settings?.failure_pause_threshold ?? 3);
-    await db
-      .from("account_groups")
-      .update({
-        consecutive_failures: failures,
-        active: pause ? false : Boolean(account?.active),
-        paused_reason: pause ? "Automatic pause after consecutive direct publishing failures." : null
-      })
-      .eq("id", publication.account_group_id);
-  }
   await logAction(db, { action: "publishing_failure", status: "failed", error: aggregate.error || undefined, publicationId });
   if (!canRetry) await notifyPublication(db, publicationId, "publication_failed");
   return aggregate;
@@ -173,7 +159,7 @@ async function startDuePublication(db: Db, item: PublicationWithRelations, now: 
   }
 
   const startable = rows.filter(
-    (row) => ["pending", "failed"].includes(row.status) && !row.external_post_id && !row.upload_session_id && row.attempt_count < 3
+    (row) => ["pending", "failed"].includes(row.status) && !row.external_post_id && !row.upload_session_id
   );
   const binary = startable.length ? await downloadDriveFile(item.videos.drive_file_id) : null;
 
@@ -326,7 +312,6 @@ export async function runDirectPublisher(now = new Date()) {
   const due = [...(scheduledQuery.data ?? []), ...(failedQuery.data ?? [])] as PublicationWithRelations[];
   let sent = 0;
   for (const item of due) {
-    if (item.status === "failed" && item.retry_count >= 3) continue;
     if (await startDuePublication(db, item, now)) sent += 1;
   }
 
@@ -337,7 +322,7 @@ export async function runDirectPublisher(now = new Date()) {
 export async function retryDirectPublication(publicationId: string) {
   const db = createServiceClient();
   const rows = await loadPlatformRows(db, publicationId);
-  for (const row of rows.filter((candidate) => candidate.status === "failed" && candidate.attempt_count < 3)) {
+  for (const row of rows.filter((candidate) => candidate.status === "failed")) {
     const preserveYouTubeUpload = row.platform === "youtube" && Boolean(row.external_post_id);
     await db
       .from("publication_platforms")

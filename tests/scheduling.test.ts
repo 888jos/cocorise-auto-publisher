@@ -146,12 +146,10 @@ describe("caption and retry rules", () => {
     expect(caption).toContain("Wake up better #Cocorise");
   });
 
-  it("schedules bounded retries", () => {
+  it("retries every five minutes without an attempt cutoff", () => {
     const now = new Date("2026-08-26T12:00:00.000Z");
-    expect(nextRetryAt(now, 0)?.toISOString()).toBe("2026-08-26T12:10:00.000Z");
-    expect(nextRetryAt(now, 1)?.toISOString()).toBe("2026-08-26T13:00:00.000Z");
-    expect(nextRetryAt(now, 2)?.toISOString()).toBe("2026-08-26T18:00:00.000Z");
-    expect(nextRetryAt(now, 3)).toBeNull();
+    expect(nextRetryAt(now, 0).toISOString()).toBe("2026-08-26T12:05:00.000Z");
+    expect(nextRetryAt(now, 1_000).toISOString()).toBe("2026-08-26T12:05:00.000Z");
   });
 
   it("pauses an account after repeated failures", () => {

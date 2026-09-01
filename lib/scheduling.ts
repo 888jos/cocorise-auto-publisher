@@ -122,10 +122,8 @@ export function renderCaption(template: CaptionTemplate, variables: Record<strin
     .trim();
 }
 
-export function nextRetryAt(now: Date, retryCount: number) {
-  const delays = [10, 60, 360];
-  const delay = delays[retryCount] ?? null;
-  return delay === null ? null : new Date(now.getTime() + delay * 60_000);
+export function nextRetryAt(now: Date, _retryCount: number) {
+  return new Date(now.getTime() + 5 * 60_000);
 }
 
 export function shouldPauseAccount(consecutiveFailures: number, threshold = 3) {
