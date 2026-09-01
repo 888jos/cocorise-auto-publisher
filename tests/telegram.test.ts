@@ -1,6 +1,13 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { buildPublicationTelegramMessage, escapeTelegramHtml, sendTelegramMessage } from "@/lib/services/telegram";
-import { normalizeTelegramCommand, telegramCommands, telegramStatsDays } from "@/lib/services/telegramCommands";
+import {
+  analyticsTotals,
+  normalizeTelegramCommand,
+  platformStatusCounts,
+  telegramAnalyticsDays,
+  telegramCommands,
+  telegramStatsDays
+} from "@/lib/services/telegramCommands";
 import type { Publication, PublicationPlatform } from "@/lib/types/domain";
 
 const publication: Publication = {
@@ -110,11 +117,42 @@ describe("Telegram notifications", () => {
     expect(telegramStatsDays("/stats nope")).toBe(7);
   });
 
+  it("supports bounded analytics periods", () => {
+    expect(telegramAnalyticsDays("/analytics")).toBe(7);
+    expect(telegramAnalyticsDays("/analytics 1")).toBe(1);
+    expect(telegramAnalyticsDays("/analytics 999")).toBe(30);
+  });
+
+  it("counts confirmed social posts separately from video jobs", () => {
+    expect(platformStatusCounts([
+      { platform: "tiktok", status: "published" },
+      { platform: "tiktok", status: "published" },
+      { platform: "instagram", status: "published" },
+      { platform: "youtube", status: "published" }
+    ])).toEqual({ tiktok: 2, instagram: 1, youtube: 1 });
+  });
+
+  it("normalizes live engagement metrics across platforms", () => {
+    expect(analyticsTotals({
+      success: true,
+      platforms: {
+        tiktok: { success: true, post_metrics: { views: 692, likes: 59, comments: 2, favorites: 3, shares: 1 } },
+        instagram: { success: true, post_metrics: { views: 148, likes: 4, comments: 1, saves: 2, shares: 3 } },
+        youtube: { success: true, post_metrics: { views: 10, likes: 1, comments: 0, favorites: 0 } }
+      }
+    })).toEqual({
+      tiktok: { posts: 1, views: 692, likes: 59, comments: 2, saves: 3, shares: 1 },
+      instagram: { posts: 1, views: 148, likes: 4, comments: 1, saves: 2, shares: 3 },
+      youtube: { posts: 1, views: 10, likes: 1, comments: 0, saves: 0, shares: 0 }
+    });
+  });
+
   it("exposes every operational command in the Telegram menu", () => {
     expect(telegramCommands.map(({ command }) => command)).toEqual([
       "status",
       "stats",
       "today",
+      "analytics",
       "content",
       "accounts",
       "queue",

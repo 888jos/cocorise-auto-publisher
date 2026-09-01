@@ -46,6 +46,23 @@ export type UploadPostStatus = {
   [key: string]: unknown;
 };
 
+export type UploadPostPostAnalytics = {
+  success?: boolean;
+  post?: {
+    request_id?: string;
+    profile_username?: string;
+    upload_timestamp?: string;
+  };
+  platforms?: Partial<Record<SocialPlatform, {
+    success?: boolean;
+    platform_post_id?: string | null;
+    post_url?: string | null;
+    error_message?: string | null;
+    post_metrics?: Record<string, unknown>;
+    post_metrics_source?: string;
+  }>>;
+};
+
 export class UploadPostApiError extends Error {
   constructor(
     message: string,
@@ -230,6 +247,11 @@ export async function getPostStatus(input: { requestId?: string | null; jobId?: 
   else if (input.jobId) params.set("job_id", input.jobId);
   else throw new Error("Upload-Post request_id or job_id is required.");
   return uploadPostRequest<UploadPostStatus>(`/uploadposts/status?${params.toString()}`);
+}
+
+export async function getPostAnalytics(requestId: string) {
+  if (!requestId.trim()) throw new Error("Upload-Post request ID is required.");
+  return uploadPostRequest<UploadPostPostAnalytics>(`/uploadposts/post-analytics/${encodeURIComponent(requestId.trim())}`);
 }
 
 export async function retryPost(input: { requestId?: string | null; jobId?: string | null }) {
