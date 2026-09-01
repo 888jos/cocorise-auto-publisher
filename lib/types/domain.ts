@@ -20,6 +20,8 @@ export type Platform = "all" | SocialPlatform;
 export type PublishingProvider = "upload_post" | "direct";
 export type ConnectionStatus = "connected" | "expired" | "revoked" | "error";
 export type PlatformPublicationStatus = "pending" | "uploading" | "processing" | "published" | "failed" | "skipped";
+export type NotificationEvent = "publication_published" | "publication_failed" | "daily_summary" | "test";
+export type NotificationStatus = "pending" | "sending" | "sent" | "failed";
 
 export type Video = {
   id: string;
@@ -143,4 +145,23 @@ export type AppSettingsRow = {
   caption_body: string;
   caption_cta: string;
   caption_hashtags: string;
+  telegram_notify_published: boolean;
+  telegram_notify_failed: boolean;
+  telegram_daily_summary: boolean;
+};
+
+export type NotificationDelivery = {
+  id: string;
+  publication_id: string | null;
+  channel: "telegram";
+  event: NotificationEvent;
+  dedupe_key: string;
+  status: NotificationStatus;
+  payload: Record<string, unknown>;
+  attempt_count: number;
+  next_retry_at: string | null;
+  sent_at: string | null;
+  last_error: string | null;
+  created_at: string;
+  updated_at: string;
 };

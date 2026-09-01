@@ -8,6 +8,7 @@ import { runQueueScheduler } from "@/lib/jobs/scheduler";
 import { logAction } from "@/lib/logger";
 import { listReadyVideos } from "@/lib/services/googleDrive";
 import { deleteSocialConnection, getValidSocialConnection } from "@/lib/services/social/connections";
+import { sendTelegramTestNotification } from "@/lib/services/telegram";
 import {
   cancelScheduledPost,
   createUploadPostConnectUrl,
@@ -68,6 +69,15 @@ export async function POST(request: Request) {
         action: "integration_test_upload_post",
         status: "ok",
         error: `${result.profiles?.length ?? 0}/${result.limit ?? "?"} profile(s), plan ${result.plan ?? "unknown"}.`
+      });
+      return back(request);
+    }
+    if (action === "test-telegram") {
+      const result = await sendTelegramTestNotification();
+      await logAction(db, {
+        action: "integration_test_telegram",
+        status: "sent",
+        error: result.messageId ? `Telegram message ${result.messageId} delivered.` : "Telegram accepted the test message."
       });
       return back(request);
     }
@@ -301,6 +311,9 @@ export async function POST(request: Request) {
         caption_body: String(form.get("caption_body") ?? ""),
         caption_cta: String(form.get("caption_cta") ?? ""),
         caption_hashtags: String(form.get("caption_hashtags") ?? ""),
+        telegram_notify_published: form.get("telegram_notify_published") === "on",
+        telegram_notify_failed: form.get("telegram_notify_failed") === "on",
+        telegram_daily_summary: form.get("telegram_daily_summary") === "on",
         updated_at: new Date().toISOString()
       });
       return back(request);

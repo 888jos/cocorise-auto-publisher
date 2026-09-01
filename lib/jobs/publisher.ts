@@ -2,6 +2,7 @@ import { logAction } from "@/lib/logger";
 import { retryUploadPostPublication, runUploadPostPublisher } from "@/lib/jobs/uploadPostPublisher";
 import { nextRetryAt, shouldPauseAccount } from "@/lib/scheduling";
 import { downloadDriveFile } from "@/lib/services/googleDrive";
+import { notifyPublication, retryPendingTelegramNotifications } from "@/lib/services/telegram";
 import { getValidSocialConnection } from "@/lib/services/social/connections";
 import {
   aggregatePlatformRows,
@@ -72,6 +73,7 @@ async function reconcilePublication(db: Db, publicationId: string, now: Date) {
       .eq("id", publicationId);
     await db.from("account_groups").update({ consecutive_failures: 0, paused_reason: null }).eq("id", publication.account_group_id);
     await logAction(db, { action: "publishing_success", status: "published", publicationId });
+    await notifyPublication(db, publicationId, "publication_published");
     return aggregate;
   }
 
@@ -120,6 +122,7 @@ async function reconcilePublication(db: Db, publicationId: string, now: Date) {
       .eq("id", publication.account_group_id);
   }
   await logAction(db, { action: "publishing_failure", status: "failed", error: aggregate.error || undefined, publicationId });
+  if (!canRetry) await notifyPublication(db, publicationId, "publication_failed");
   return aggregate;
 }
 
@@ -297,8 +300,9 @@ async function pollProcessingPlatforms(db: Db, now: Date) {
 
 export async function runDirectPublisher(now = new Date()) {
   const db = createServiceClient();
+  const notificationsRetried = await retryPendingTelegramNotifications(db);
   const { data: settings } = await db.from("app_settings").select("pause_all_publishing").eq("id", true).maybeSingle();
-  if (settings?.pause_all_publishing) return { sent: 0, checked: 0, paused: true, provider: "direct" as const };
+  if (settings?.pause_all_publishing) return { sent: 0, checked: 0, notificationsRetried, paused: true, provider: "direct" as const };
 
   const [scheduledQuery, failedQuery] = await Promise.all([
     db
@@ -327,7 +331,7 @@ export async function runDirectPublisher(now = new Date()) {
   }
 
   const checked = await pollProcessingPlatforms(db, now);
-  return { sent, checked, paused: false, provider: "direct" as const };
+  return { sent, checked, notificationsRetried, paused: false, provider: "direct" as const };
 }
 
 export async function retryDirectPublication(publicationId: string) {

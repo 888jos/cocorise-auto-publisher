@@ -1,6 +1,7 @@
 import { logAction } from "@/lib/logger";
 import { nextRetryAt, shouldPauseAccount } from "@/lib/scheduling";
 import { downloadDriveFile } from "@/lib/services/googleDrive";
+import { notifyPublication, retryPendingTelegramNotifications } from "@/lib/services/telegram";
 import { aggregatePlatformRows, enabledPlatforms } from "@/lib/services/social/publisher";
 import {
   getPostStatus,
@@ -131,6 +132,7 @@ async function reconcilePublication(db: Db, publicationId: string, now: Date) {
       .eq("id", publicationId);
     await db.from("account_groups").update({ consecutive_failures: 0, paused_reason: null }).eq("id", publication.account_group_id);
     await logAction(db, { action: "upload_post_success", status: "published", publicationId });
+    await notifyPublication(db, publicationId, "publication_published");
     return aggregate;
   }
 
@@ -175,6 +177,7 @@ async function reconcilePublication(db: Db, publicationId: string, now: Date) {
       .eq("id", publication.account_group_id);
   }
   await logAction(db, { action: "upload_post_failure", status: "failed", error: aggregate.error || undefined, publicationId });
+  if (!canRetry) await notifyPublication(db, publicationId, "publication_failed");
   return aggregate;
 }
 
@@ -186,6 +189,7 @@ async function markPreparationFailure(db: Db, item: PublicationWithRelations, no
     .update({ status: "failed", failed_at: now.toISOString(), next_retry_at: retryAt?.toISOString() ?? null, error_message: message })
     .eq("id", item.id);
   await logAction(db, { action: "upload_post_prepare", status: "failed", error: message, publicationId: item.id });
+  if (!retryAt) await notifyPublication(db, item.id, "publication_failed");
 }
 
 async function submitPublication(db: Db, item: PublicationWithRelations, now: Date) {
@@ -412,8 +416,9 @@ export async function retryUploadPostPublication(publicationId: string) {
 
 export async function runUploadPostPublisher(now = new Date()) {
   const db = createServiceClient();
+  const notificationsRetried = await retryPendingTelegramNotifications(db);
   const { data: settings } = await db.from("app_settings").select("pause_all_publishing").eq("id", true).maybeSingle();
-  if (settings?.pause_all_publishing) return { sent: 0, checked: 0, paused: true, provider: "upload_post" as const };
+  if (settings?.pause_all_publishing) return { sent: 0, checked: 0, notificationsRetried, paused: true, provider: "upload_post" as const };
 
   const [scheduledQuery, failedQuery] = await Promise.all([
     db
@@ -447,5 +452,5 @@ export async function runUploadPostPublisher(now = new Date()) {
   }
 
   const checked = await pollProcessingPublications(db, now);
-  return { sent, checked, paused: false, provider: "upload_post" as const };
+  return { sent, checked, notificationsRetried, paused: false, provider: "upload_post" as const };
 }

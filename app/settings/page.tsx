@@ -22,7 +22,10 @@ const defaults = {
   caption_hook: "",
   caption_body: "",
   caption_cta: "",
-  caption_hashtags: ""
+  caption_hashtags: "",
+  telegram_notify_published: true,
+  telegram_notify_failed: true,
+  telegram_daily_summary: true
 };
 
 export default async function SettingsPage() {
@@ -47,6 +50,7 @@ export default async function SettingsPage() {
         ["Public app URL", readiness.appUrl],
         ["Cron Secret", readiness.cron]
       ];
+  integrationRows.push(["Telegram", readiness.telegram]);
 
   return (
     <>
@@ -63,6 +67,7 @@ export default async function SettingsPage() {
           <div className="flex flex-wrap gap-2">
             <ActionButton action="test-google-drive">Test Google Drive</ActionButton>
             {readiness.provider === "upload_post" ? <ActionButton action="test-upload-post">Test Upload-Post</ActionButton> : null}
+            {readiness.telegram ? <ActionButton action="test-telegram">Test Telegram</ActionButton> : null}
           </div>
         </div>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -99,6 +104,21 @@ export default async function SettingsPage() {
                 <input className="mt-2 w-full rounded-md border border-line bg-ink px-3 py-2 text-sm text-white outline-none focus:border-mint/60" name={String(name)} type={String(type)} defaultValue={String(value)} />
               </label>
             ))}
+          </div>
+          <div className="mt-6 border-t border-line pt-5">
+            <h2 className="text-sm font-semibold text-white">Telegram notifications</h2>
+            <div className="mt-4 grid gap-3 md:grid-cols-3">
+              {[
+                ["Successful publications", "telegram_notify_published", values.telegram_notify_published],
+                ["Terminal failures", "telegram_notify_failed", values.telegram_notify_failed],
+                ["Daily summary", "telegram_daily_summary", values.telegram_daily_summary]
+              ].map(([label, name, checked]) => (
+                <label key={String(name)} className="flex items-center gap-3 rounded-md border border-line bg-ink p-3 text-sm text-white">
+                  <input name={String(name)} type="checkbox" defaultChecked={Boolean(checked)} />
+                  {String(label)}
+                </label>
+              ))}
+            </div>
           </div>
           <div className="mt-6 border-t border-line pt-5">
             <h2 className="text-sm font-semibold text-white">Real caption variables</h2>

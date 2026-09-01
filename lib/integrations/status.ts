@@ -18,6 +18,7 @@ export function getIntegrationReadiness() {
     tiktok: Boolean(process.env.TIKTOK_CLIENT_KEY && process.env.TIKTOK_CLIENT_SECRET),
     instagram: Boolean(process.env.INSTAGRAM_APP_ID && process.env.INSTAGRAM_APP_SECRET),
     youtube: Boolean(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET),
+    telegram: Boolean(process.env.TELEGRAM_BOT_TOKEN && process.env.TELEGRAM_CHAT_ID && process.env.TELEGRAM_WEBHOOK_SECRET),
     cron: Boolean(process.env.CRON_SECRET),
     folders: {
       ready: Boolean(process.env.GOOGLE_DRIVE_READY_FOLDER_ID),
