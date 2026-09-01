@@ -110,14 +110,20 @@ describe("scheduling rules", () => {
   it("generates staggered account slots inside posting windows", () => {
     const accountTwo = { ...account, id: "account-2", name: "Cocorise 02" };
     const day = new Date("2026-08-26T00:00:00.000Z");
-    const [first] = generateAccountSlots(account, day, 1, defaultSchedulerSettings);
+    const slots = generateAccountSlots(account, day, 1, defaultSchedulerSettings);
+    const [first] = slots;
     const [second] = generateAccountSlots(accountTwo, day, 1, defaultSchedulerSettings);
     expect(first.getTime()).not.toBe(second.getTime());
     expect(formatInTimeZone(first, account.timezone, "yyyy-MM-dd")).toBe("2026-08-26");
-    expect(Number(formatInTimeZone(first, account.timezone, "HH"))).toBeGreaterThanOrEqual(9);
-    expect(Number(formatInTimeZone(first, account.timezone, "HH"))).toBeLessThanOrEqual(10);
-    expect(first.getUTCHours()).toBeGreaterThanOrEqual(7);
-    expect(first.getUTCHours()).toBeLessThanOrEqual(8);
+    const localMinutes = slots.map((slot) => Number(formatInTimeZone(slot, account.timezone, "HH")) * 60
+      + Number(formatInTimeZone(slot, account.timezone, "mm")));
+    expect(localMinutes[0]).toBeGreaterThanOrEqual(6 * 60 + 30);
+    expect(localMinutes[0]).toBeLessThan(7 * 60 + 30);
+    expect(localMinutes[1]).toBeGreaterThanOrEqual(16 * 60 + 30);
+    expect(localMinutes[1]).toBeLessThan(17 * 60 + 30);
+    expect(localMinutes[2]).toBeGreaterThanOrEqual(21 * 60 + 30);
+    expect(localMinutes[2]).toBeLessThan(22 * 60 + 30);
+    expect(generateAccountSlots(account, day, 1, defaultSchedulerSettings)).toEqual(slots);
   });
 
   it("keeps the requested queue horizon", () => {

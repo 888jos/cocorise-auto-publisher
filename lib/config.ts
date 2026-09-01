@@ -4,14 +4,14 @@ export const defaultSchedulerSettings: SchedulerSettings = {
   postsPerDay: 3,
   reuseCooldownHours: 96,
   scheduleHorizonDays: 7,
-  minStaggerMinutes: 7,
-  maxStaggerMinutes: 53,
+  minStaggerMinutes: 0,
+  maxStaggerMinutes: 59,
   minMinutesBetweenPosts: 150,
   timezone: "Europe/Paris",
   windows: [
-    { name: "Morning", start: "09:00", end: "11:00" },
-    { name: "Afternoon", start: "14:00", end: "17:00" },
-    { name: "Evening", start: "19:00", end: "22:00" }
+    { name: "Morning", start: "06:30", end: "07:30" },
+    { name: "Afternoon", start: "16:30", end: "17:30" },
+    { name: "Evening", start: "21:30", end: "22:30" }
   ]
 };
 
