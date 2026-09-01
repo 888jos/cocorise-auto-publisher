@@ -68,6 +68,24 @@ describe("Upload-Post publishing contract", () => {
     ).toMatchObject({ status: "failed", errorMessage: "profile_platform_not_configured" });
   });
 
+  it("keeps an asynchronous platform processing when success is temporarily false", () => {
+    expect(
+      mapUploadPostResult(
+        { platform: "tiktok", status: "processing", success: false, attempts: 1 },
+        "processing"
+      )
+    ).toMatchObject({ status: "processing", errorMessage: null });
+  });
+
+  it("only treats success false as failed once the provider job is terminal", () => {
+    expect(
+      mapUploadPostResult(
+        { platform: "youtube", status: "processing", success: false, attempts: 1 },
+        "completed"
+      )
+    ).toMatchObject({ status: "failed", errorMessage: "Upload-Post reported a publishing failure." });
+  });
+
   it("maps a completed live post with its public identifiers", () => {
     expect(
       mapUploadPostResult(

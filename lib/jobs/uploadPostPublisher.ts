@@ -69,8 +69,11 @@ function providerError(result: UploadPostResult, fallback: string) {
 
 export function mapUploadPostResult(result: UploadPostResult, providerStatus: string) {
   const rawStatus = String(result.status || "").toLowerCase();
+  const normalizedProviderStatus = providerStatus.toLowerCase();
   const fallbackToInbox = result.fallback_to_inbox === true;
   const skipped = result.skipped === true || rawStatus === "skipped";
+  const providerIsTerminal = ["completed", "failed", "not_found"].includes(normalizedProviderStatus);
+  const providerFailed = ["failed", "not_found"].includes(normalizedProviderStatus);
   let status: PlatformPublicationStatus = "processing";
   let errorMessage: string | null = null;
 
@@ -80,14 +83,14 @@ export function mapUploadPostResult(result: UploadPostResult, providerStatus: st
   } else if (skipped) {
     status = "failed";
     errorMessage = providerError(result, "Platform is not connected to this Upload-Post profile.");
-  } else if (rawStatus === "completed" || (providerStatus === "completed" && result.success === true)) {
+  } else if (rawStatus === "completed" || (normalizedProviderStatus === "completed" && result.success === true)) {
     status = "published";
-  } else if (["failed"].includes(rawStatus) || result.success === false || providerStatus === "failed") {
+  } else if (rawStatus === "retryable") {
+    status = providerFailed ? "failed" : "processing";
+    errorMessage = status === "failed" ? providerError(result, "Upload-Post retryable failure was not recovered.") : null;
+  } else if (rawStatus === "failed" || providerFailed || (providerIsTerminal && result.success === false)) {
     status = "failed";
     errorMessage = providerError(result, "Upload-Post reported a publishing failure.");
-  } else if (rawStatus === "retryable") {
-    status = providerStatus === "failed" ? "failed" : "processing";
-    errorMessage = status === "failed" ? providerError(result, "Upload-Post retryable failure was not recovered.") : null;
   }
 
   return {

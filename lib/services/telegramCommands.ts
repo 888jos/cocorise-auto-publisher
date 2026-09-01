@@ -163,10 +163,11 @@ export async function telegramCommandReply(text: string, now = new Date()) {
   const timezone = settings.timezone || "Europe/Paris";
 
   if (command === "/status") {
-    const [activeAccounts, queued, failed] = await Promise.all([
+    const [activeAccounts, queued, recovering, failed] = await Promise.all([
       db.from("account_groups").select("id", { count: "exact", head: true }).eq("active", true),
       db.from("publications").select("id", { count: "exact", head: true }).in("status", ["queued", "scheduled", "sending", "processing"]),
-      db.from("publications").select("id", { count: "exact", head: true }).eq("status", "failed")
+      db.from("publications").select("id", { count: "exact", head: true }).eq("status", "failed").not("next_retry_at", "is", null),
+      db.from("publications").select("id", { count: "exact", head: true }).eq("status", "failed").is("next_retry_at", null)
     ]);
     return [
       "📡 <b>État Cocorise</b>",
@@ -174,7 +175,8 @@ export async function telegramCommandReply(text: string, now = new Date()) {
       `Publication : <b>${settings.pause_all_publishing ? "en pause" : "active"}</b>`,
       `Comptes actifs : <b>${activeAccounts.count ?? 0}</b>`,
       `Dans la file : <b>${queued.count ?? 0}</b>`,
-      `Échecs à vérifier : <b>${failed.count ?? 0}</b>`
+      `Incidents en récupération : <b>${recovering.count ?? 0}</b>`,
+      `Échecs définitifs : <b>${failed.count ?? 0}</b>`
     ].join("\n");
   }
 
