@@ -18,6 +18,20 @@ export function enabledPlatforms(account: AccountGroup): SocialPlatform[] {
   ];
 }
 
+export function platformsForPublication(account: AccountGroup, scheduledAt: string | Date): SocialPlatform[] {
+  const platforms = enabledPlatforms(account);
+  if (!account.youtube_enabled) return platforms;
+
+  const timezone = account.timezone || "Europe/Paris";
+  const formatter = new Intl.DateTimeFormat("en-GB", {
+    timeZone: timezone,
+    hour: "2-digit",
+    hour12: false
+  });
+  const localHour = Number(formatter.format(new Date(scheduledAt)));
+  return platforms.filter((platform) => platform !== "youtube" || localHour < 12);
+}
+
 export async function startPlatformPublication(input: {
   platform: SocialPlatform;
   accessToken: string;

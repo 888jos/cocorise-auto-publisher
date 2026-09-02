@@ -7,7 +7,7 @@ import { getValidSocialConnection } from "@/lib/services/social/connections";
 import {
   aggregatePlatformRows,
   checkPlatformPublication,
-  enabledPlatforms,
+  platformsForPublication,
   startPlatformPublication
 } from "@/lib/services/social/publisher";
 import { createServiceClient } from "@/lib/supabase/server";
@@ -113,13 +113,27 @@ async function reconcilePublication(db: Db, publicationId: string, now: Date) {
 }
 
 async function preparePlatformRows(db: Db, publication: PublicationWithRelations) {
-  const platforms = enabledPlatforms(publication.account_groups);
+  const platforms = platformsForPublication(publication.account_groups, publication.scheduled_at);
   if (!platforms.length) throw new Error(`${publication.account_groups.name} has no enabled platform.`);
   const { error } = await db.from("publication_platforms").upsert(
     platforms.map((platform) => ({ publication_id: publication.id, platform, status: "pending" })),
     { onConflict: "publication_id,platform", ignoreDuplicates: true }
   );
   if (error) throw error;
+  const skippedPlatforms = (["tiktok", "instagram", "youtube"] as const).filter((platform) => !platforms.includes(platform));
+  if (skippedPlatforms.length) {
+    await db
+      .from("publication_platforms")
+      .update({
+        status: "skipped",
+        error_message: null,
+        raw_status: { skipped: true, reason: "platform limited for this time slot" },
+        updated_at: new Date().toISOString()
+      })
+      .eq("publication_id", publication.id)
+      .in("platform", skippedPlatforms)
+      .in("status", ["pending", "failed"]);
+  }
   return loadPlatformRows(db, publication.id);
 }
 

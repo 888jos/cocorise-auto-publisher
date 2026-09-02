@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { decryptToken, encryptToken } from "@/lib/security/tokens";
-import { aggregatePlatformRows, enabledPlatforms } from "@/lib/services/social/publisher";
+import { aggregatePlatformRows, enabledPlatforms, platformsForPublication } from "@/lib/services/social/publisher";
 import { planTikTokChunks } from "@/lib/services/social/tiktok";
 import type { AccountGroup, PublicationPlatform } from "@/lib/types/domain";
 
@@ -47,6 +47,13 @@ describe("direct social publishing contract", () => {
 
   it("only publishes to enabled account platforms", () => {
     expect(enabledPlatforms(account)).toEqual(["tiktok", "youtube"]);
+  });
+
+  it("limits YouTube to the morning publishing slot", () => {
+    const allEnabled = { ...account, instagram_enabled: true };
+    expect(platformsForPublication(allEnabled, "2026-09-02T05:30:00.000Z")).toEqual(["tiktok", "instagram", "youtube"]);
+    expect(platformsForPublication(allEnabled, "2026-09-02T15:30:00.000Z")).toEqual(["tiktok", "instagram"]);
+    expect(platformsForPublication(allEnabled, "2026-09-02T20:30:00.000Z")).toEqual(["tiktok", "instagram"]);
   });
 
   it("uses one TikTok upload for videos up to 64 MB", () => {

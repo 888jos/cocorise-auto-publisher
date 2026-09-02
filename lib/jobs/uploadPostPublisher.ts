@@ -2,7 +2,7 @@ import { logAction } from "@/lib/logger";
 import { nextRetryAt, shouldPauseAccount } from "@/lib/scheduling";
 import { downloadDriveFile } from "@/lib/services/googleDrive";
 import { notifyPublication, retryPendingTelegramNotifications } from "@/lib/services/telegram";
-import { aggregatePlatformRows, enabledPlatforms } from "@/lib/services/social/publisher";
+import { aggregatePlatformRows, platformsForPublication } from "@/lib/services/social/publisher";
 import {
   getPostStatus,
   getUploadPostProfile,
@@ -47,7 +47,7 @@ async function loadPlatformRows(db: Db, publicationId: string) {
 }
 
 async function preparePlatformRows(db: Db, publication: PublicationWithRelations) {
-  const platforms = enabledPlatforms(publication.account_groups);
+  const platforms = platformsForPublication(publication.account_groups, publication.scheduled_at);
   if (!platforms.length) throw new Error(`${publication.account_groups.name} has no enabled platform.`);
   if (!publication.account_groups.upload_post_profile) throw new Error(`${publication.account_groups.name} has no Upload-Post profile username.`);
   const profile = (await getUploadPostProfile(publication.account_groups.upload_post_profile)).profile;
@@ -60,6 +60,20 @@ async function preparePlatformRows(db: Db, publication: PublicationWithRelations
     { onConflict: "publication_id,platform", ignoreDuplicates: true }
   );
   if (error) throw error;
+  const skippedPlatforms = (["tiktok", "instagram", "youtube"] as const).filter((platform) => !platforms.includes(platform));
+  if (skippedPlatforms.length) {
+    await db
+      .from("publication_platforms")
+      .update({
+        status: "skipped",
+        error_message: null,
+        raw_status: { skipped: true, reason: "platform limited for this time slot" },
+        updated_at: new Date().toISOString()
+      })
+      .eq("publication_id", publication.id)
+      .in("platform", skippedPlatforms)
+      .in("status", ["pending", "failed"]);
+  }
   return loadPlatformRows(db, publication.id);
 }
 
@@ -243,7 +257,7 @@ async function submitPublication(db: Db, item: PublicationWithRelations, now: Da
     const binary = await downloadDriveFile(item.videos.drive_file_id);
     const request = {
       profile: item.account_groups.upload_post_profile!,
-      platforms: enabledPlatforms(item.account_groups),
+      platforms: startable.map((row) => row.platform),
       caption: item.caption,
       publicationId: item.id,
       filename: binary.filename,
@@ -295,6 +309,7 @@ async function applyProviderStatus(db: Db, publication: Publication, providerSta
   const terminal = ["completed", "failed", "not_found"].includes(providerStatus.status);
 
   for (const row of rows) {
+    if (row.status === "skipped") continue;
     const result = resultByPlatform.get(row.platform);
     if (result) {
       const mapped = mapUploadPostResult(result, providerStatus.status);
